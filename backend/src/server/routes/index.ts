@@ -1,5 +1,4 @@
 import { CronJob } from "cron";
-// import { Redis } from "ioredis";
 import { Knex } from "knex";
 import { z } from "zod";
 
@@ -106,6 +105,8 @@ import { externalMigrationServiceFactory } from "@app/services/external-migratio
 import { groupProjectDALFactory } from "@app/services/group-project/group-project-dal";
 import { groupProjectMembershipRoleDALFactory } from "@app/services/group-project/group-project-membership-role-dal";
 import { groupProjectServiceFactory } from "@app/services/group-project/group-project-service";
+import { HsmModule } from "@app/services/hsm/hsm-fns";
+import { hsmServiceFactory } from "@app/services/hsm/hsm-service";
 import { identityDALFactory } from "@app/services/identity/identity-dal";
 import { identityMetadataDALFactory } from "@app/services/identity/identity-metadata-dal";
 import { identityOrgDALFactory } from "@app/services/identity/identity-org-dal";
@@ -221,10 +222,18 @@ export const registerRoutes = async (
   {
     auditLogDb,
     db,
+    hsmModule,
     smtp: smtpService,
     queue: queueService,
     keyStore
-  }: { auditLogDb?: Knex; db: Knex; smtp: TSmtpService; queue: TQueueServiceFactory; keyStore: TKeyStoreFactory }
+  }: {
+    auditLogDb?: Knex;
+    db: Knex;
+    hsmModule: HsmModule;
+    smtp: TSmtpService;
+    queue: TQueueServiceFactory;
+    keyStore: TKeyStoreFactory;
+  }
 ) => {
   const appCfg = getConfig();
   await server.register(registerSecretScannerGhApp, { prefix: "/ss-webhook" });
@@ -348,14 +357,21 @@ export const registerRoutes = async (
     projectDAL
   });
   const licenseService = licenseServiceFactory({ permissionService, orgDAL, licenseDAL, keyStore });
+
+  const hsmService = hsmServiceFactory({
+    pkcs11Module: hsmModule
+  });
+
   const kmsService = kmsServiceFactory({
     kmsRootConfigDAL,
     keyStore,
     kmsDAL,
     internalKmsDAL,
     orgDAL,
-    projectDAL
+    projectDAL,
+    hsmService
   });
+
   const externalKmsService = externalKmsServiceFactory({
     kmsDAL,
     kmsService,
@@ -1254,6 +1270,7 @@ export const registerRoutes = async (
   // setup the communication with license key server
   await licenseService.init();
 
+  hsmService.startService();
   await telemetryQueue.startTelemetryCheck();
   await dailyResourceCleanUp.startCleanUp();
   await dailyExpiringPkiItemAlert.startSendingAlerts();
@@ -1331,6 +1348,7 @@ export const registerRoutes = async (
     secretSharing: secretSharingService,
     userEngagement: userEngagementService,
     externalKms: externalKmsService,
+    hsm: hsmService,
     cmek: cmekService,
     orgAdmin: orgAdminService,
     slack: slackService,
