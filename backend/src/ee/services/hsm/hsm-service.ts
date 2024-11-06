@@ -80,10 +80,7 @@ export const hsmServiceFactory = ({ hsmModule: { module, graphene } }: THsmServi
 
       // Execute the callback and await its result (works for both sync and async)
       const result = await callbackWithSession(session);
-
-      if (session) {
-        removeSession();
-      }
+      removeSession();
 
       return result;
     } finally {
