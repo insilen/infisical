@@ -1,18 +1,13 @@
 import grapheneLib from "graphene-pk11";
 
-import { TKeyStoreFactory } from "@app/keystore/keystore";
 import { getConfig } from "@app/lib/config/env";
 import { logger } from "@app/lib/logger";
-import { Lock } from "@app/lib/red-lock";
 
 import { HsmModule, RequiredMechanisms } from "./hsm-types";
 
 type THsmServiceFactoryDep = {
   hsmModule: HsmModule;
-  keyStore: Pick<TKeyStoreFactory, "acquireLock" | "waitTillReady" | "setItemWithExpiry">;
 };
-
-const HSM_SESSION_WAIT_KEY = "wait_till_hsm_session_ready";
 
 const USER_ALREADY_LOGGED_IN_ERROR = "CKR_USER_ALREADY_LOGGED_IN";
 const WRAPPED_KEY_LENGTH = 32 + 8; // AES-256 key + padding
@@ -23,7 +18,7 @@ type SyncOrAsync<T> = T | Promise<T>;
 type SessionCallback<T> = (session: grapheneLib.Session) => SyncOrAsync<T>;
 
 // eslint-disable-next-line no-empty-pattern
-export const hsmServiceFactory = ({ hsmModule: { module, graphene }, keyStore }: THsmServiceFactoryDep) => {
+export const hsmServiceFactory = ({ hsmModule: { module, graphene } }: THsmServiceFactoryDep) => {
   const appCfg = getConfig();
 
   // Constants for buffer structure
@@ -35,7 +30,6 @@ export const hsmServiceFactory = ({ hsmModule: { module, graphene }, keyStore }:
     const MAX_TIMEOUT = 30_000; // 30 seconds maximum total time
 
     let session: grapheneLib.Session | null = null;
-    let lock: Lock | null = null;
 
     const removeSession = () => {
       if (session) {
@@ -55,16 +49,6 @@ export const hsmServiceFactory = ({ hsmModule: { module, graphene }, keyStore }:
       // eslint-disable-next-line no-bitwise
       if (!(slot.flags & graphene.SlotFlag.TOKEN_PRESENT)) {
         throw new Error("Slot is not initialized");
-      }
-
-      lock = await keyStore.acquireLock(["HSM_SESSION_LOCK"], 10_000, { retryCount: 3 }).catch(() => null);
-
-      if (!lock) {
-        await keyStore.waitTillReady({
-          key: HSM_SESSION_WAIT_KEY,
-          keyCheckCb: (val) => val === "true",
-          waitingCb: () => logger.info("HSM Lock: Waiting for session to be available...")
-        });
       }
 
       const startTime = Date.now();
@@ -99,7 +83,6 @@ export const hsmServiceFactory = ({ hsmModule: { module, graphene }, keyStore }:
 
       if (session) {
         removeSession();
-        await keyStore.setItemWithExpiry(HSM_SESSION_WAIT_KEY, 10, "true");
       }
 
       return result;
@@ -110,8 +93,6 @@ export const hsmServiceFactory = ({ hsmModule: { module, graphene }, keyStore }:
       } catch (error) {
         logger.error(error, "Error cleaning up HSM session:");
       }
-
-      await lock?.release();
     }
   };
 
