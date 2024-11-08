@@ -130,8 +130,8 @@ export const hsmServiceFactory = ({ hsmModule: { isInitialized, pkcs11 } }: THsm
   };
 
   const $findKey = (sessionHandle: pkcs11js.Handle, type: HsmKeyType) => {
-    const label = type === "hmac" ? `${appCfg.HSM_KEY_LABEL}_HMAC` : appCfg.HSM_KEY_LABEL;
-    const keyType = type === "hmac" ? pkcs11js.CKK_GENERIC_SECRET : pkcs11js.CKK_AES;
+    const label = type === HsmKeyType.HMAC ? `${appCfg.HSM_KEY_LABEL}_HMAC` : appCfg.HSM_KEY_LABEL;
+    const keyType = type === HsmKeyType.HMAC ? pkcs11js.CKK_GENERIC_SECRET : pkcs11js.CKK_AES;
 
     const template = [
       { type: pkcs11js.CKA_CLASS, value: pkcs11js.CKO_SECRET_KEY },
