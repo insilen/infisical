@@ -171,7 +171,7 @@ const envSchema = z
         .string()
         .optional()
         .transform((val) => {
-          // if (process.env.NODE_ENV === "development") return "/usr/local/lib/softhsm/libsofthsm2.so";
+          if (process.env.NODE_ENV === "development") return "/usr/local/lib/softhsm/libsofthsm2.so";
           return val;
         })
     ),
@@ -180,7 +180,7 @@ const envSchema = z
         .string()
         .optional()
         .transform((val) => {
-          // if (process.env.NODE_ENV === "development") return "1234";
+          if (process.env.NODE_ENV === "development") return "1234";
           return val;
         })
     ),
@@ -189,7 +189,7 @@ const envSchema = z
         .string()
         .optional()
         .transform((val) => {
-          // if (process.env.NODE_ENV === "development") return "auth-app";
+          if (process.env.NODE_ENV === "development") return "auth-app";
           return val;
         })
     ),
